@@ -1,0 +1,11 @@
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# ignore large files
+01_descriptives/input/
+01_descriptives/output/
