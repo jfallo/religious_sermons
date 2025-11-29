@@ -1,0 +1,16 @@
+# MacOS junk
+.DS_Store
+input/.DS_Store
+intermediate/.DS_Store
+output/.DS_Store
+
+# Python venv
+bin/
+include/
+lib/
+pyvenv.cfg
+
+# large files
+input/extracted_data.csv
+intermediate/sermons.dta
+output/sermons.csv
