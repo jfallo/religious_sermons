@@ -1,0 +1,9 @@
+# MacOS junk
+.DS_Store
+output/.DS_Store
+
+# Python venv
+bin/
+include/
+lib/
+pyvenv.cfg
