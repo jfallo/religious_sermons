@@ -8,11 +8,6 @@ output/.DS_Store
 venv/
 
 # large files
-input/tl_2023_us_state
 input/extracted_data.csv
-input/denomination_ARDA.dta
-input/presidents.dta
-input/state_population.dta
 intermediate/sermons.dta
 output/sermons.csv
-output/state_coverage_map.dta
