@@ -5,12 +5,14 @@ intermediate/.DS_Store
 output/.DS_Store
 
 # Python venv
-bin/
-include/
-lib/
-pyvenv.cfg
+venv/
 
 # large files
+input/tl_2023_us_state
 input/extracted_data.csv
+input/denomination_ARDA.dta
+input/presidents.dta
+input/state_population.dta
 intermediate/sermons.dta
 output/sermons.csv
+output/state_coverage_map.dta

@@ -123,7 +123,7 @@ for year, election_date in election_dates.items():
 
 # helper functions for cleaning texts
 def protect_links(text):
-    # replace URLs and emails with placeholders
+    # replace urls and emails with placeholders
     urls = re.findall(r'(https?://\S+|www\.\S+)', text)
     emails = re.findall(r'\S+@\S+\.\S+', text)
     
@@ -135,7 +135,7 @@ def protect_links(text):
     return text, urls, emails
 
 def restore_links(text, urls, emails):
-    # restore URLs and emails from placeholders
+    # restore urls and emails from placeholders
     for i, url in enumerate(urls):
         text = text.replace(f'__URL_{i}__', url)
     for j, email in enumerate(emails):
@@ -148,28 +148,22 @@ def clean_text(text):
     if not isinstance(text, str) or text.strip() == '':
         return text
     
-    # protect links, urls, and emails
+    # protect links, urls, emails, and ellipses
     text, urls, emails = protect_links(text)
-    # protect ellipsis
     text = text.replace('...', '__ELLIPSIS__')
 
-    # replace • with ,
+    # replace bad apostrophes, bullets with commas, and all characters except alphanumeric or . , : ; ? ! ' _ @ / - with space
     text = re.sub('•', ',', text)
-    # replace ’ with '
     text = re.sub('’', "'", text)
-    # replace all characters except alphanumeric and . , : ; ? ! ' _ @ / - with space
     text = re.sub(r"[^a-zA-Z0-9.,:;?!'_@\/\-]", ' ', text)
 
-    # fix spacing (only single space)
+    # fix spacing
     text = re.sub(r'([!?])([A-Z])', r'\1 \2', text)
     text = re.sub(r'\s{2,}', ' ', text)
-
-    # add space after punctuation if missing
     text = re.sub(r'([^\s.?!])', r'\1', text)
 
-    # restore links, urls, and emails
+    # restore links, urls, emails, and ellipses
     text = restore_links(text, urls, emails)
-    # restore ellipses
     text = text.replace('__ELLIPSIS__', '...')
 
     # trim whitespace around lines and collapse 3+ newlines to 2
@@ -179,11 +173,9 @@ def clean_text(text):
 
     return text.strip()
 
-# clean texts
+# clean texts, column names, and string columns
 df['sermontext'] = df['sermontext'].where(df['sermontext'].isna(), df['sermontext'].astype(str).apply(clean_text))
-# clean column names
 df.columns = df.columns.str.strip()
-# clean string columns
 df = df.apply(lambda x : x.str.strip() if x.dtype == 'object' else x)
-# save sermons data
+# save cleaned sermons data
 df.to_csv('output/sermons.csv', encoding= 'utf-8', index= True, quoting= csv.QUOTE_ALL)
