@@ -3,5 +3,9 @@
 input/.DS_Store
 output/.DS_Store
 
+# Python venv
+venv/
+
 # large files
 input/sermons.csv
+intermediate/sermons.csv
