@@ -9,3 +9,4 @@ venv/
 # large files
 input/sermons.csv
 intermediate/sermons.csv
+intermediate/sermonscopy.csv

@@ -6,8 +6,10 @@ from wordfreq import word_frequency
 import spacy
 nlp = spacy.load('en_core_web_sm')
 
-# load sermon texts
+
+# load sermons
 df = pd.read_csv("input/sermons.csv")
+
 
 # word length helper functions
 def get_words_from_text(text):
@@ -183,7 +185,7 @@ countsBrown = Counter(wordsBrown)
 def get_word_rarity_metrics(text):
     words = get_words_from_text(text)
 
-    # percentage of words that are Dale-Chall words
+    # percent of words that are Dale-Chall words
     percentDaleChall = sum(1 for w in words if w in wordsDaleChall) / len(words) if words else 0
     # avg freq of words relative to freq of "the" in Brown corpus
     theFreqBrown = countsBrown['the']
@@ -237,16 +239,26 @@ def get_pos_metrics(text):
     return prNoun, prPropN, prAdj, prVerb, prAdv
 
 
-df[['avgWordChars', 'W7C', 'W6C', 'avgWordSylls', 'Wgeq3Sy', 'Wlt3Sy', 'W2Sy', 'W1Sy']] = df['sermontext'].apply(
-    lambda text : get_word_length_metrics(text) if pd.notna(text) else [None] * 8
-).tolist()
-df[['avgSentenceChars', 'avgSentenceWords', 'avgSentenceSylls', 'prSentencesChars']] = df['sermontext'].apply(
-    lambda text : get_sentence_length_metrics(text) if pd.notna(text) else [None] * 4
-).tolist()
-df[['percentDaleChall', 'freqBrown', 'freqWordFreq']] = df['sermontext'].apply(
-    lambda text : get_word_rarity_metrics(text) if pd.notna(text) else [None] * 3
-).tolist()
-df[['prNoun', 'prPropN', 'prAdj', 'prVerb', 'prAdv']] = df['sermontext'].apply(
-    lambda text : get_pos_metrics(text) if pd.notna(text) else [None] * 5
-).tolist()
-df.to_csv("intermediate/sermons.csv", index= False, quoting= csv.QUOTE_ALL)
+batch_size = 1000
+first_batch = True
+for start in range(0, len(df), batch_size):
+    end = min(start + batch_size, len(df))
+    batch = df.iloc[start:end].copy()
+
+    batch[['avgWordChars', 'perW7C', 'perW6C', 'avgWordSylls', 'perWgeq3Sy', 'perWlt3Sy', 'perW2Sy', 'perW1Sy']] = batch['sermontext'].apply(
+        lambda text : get_word_length_metrics(text) if pd.notna(text) else [None] * 8
+    ).tolist()
+    batch[['avgSentenceChars', 'avgSentenceWords', 'avgSentenceSylls', 'prSentenceChar']] = batch['sermontext'].apply(
+        lambda text : get_sentence_length_metrics(text) if pd.notna(text) else [None] * 4
+    ).tolist()
+    batch[['perDaleChall', 'freqBrown', 'freqWordfreq']] = batch['sermontext'].apply(
+        lambda text : get_word_rarity_metrics(text) if pd.notna(text) else [None] * 3
+    ).tolist()
+    batch[['prNoun', 'prPropN', 'prAdj', 'prVerb', 'prAdv']] = batch['sermontext'].apply(
+        lambda text : get_pos_metrics(text) if pd.notna(text) and len(text) < 100000 else [None] * 5
+    ).tolist()
+
+    batch.to_csv("intermediate/sermons.csv", mode= 'w' if first_batch else 'a', header= first_batch, index= False, quoting= csv.QUOTE_ALL)
+    first_batch = False
+
+    print(f"Rows {start} to {end} complete.")
