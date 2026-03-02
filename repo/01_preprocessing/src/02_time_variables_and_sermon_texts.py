@@ -166,7 +166,11 @@ def clean_text(text):
     text = re.sub(r'\b([A-Z][a-z]+)(\d)', r'\1 \2', text)
     text = re.sub(r'(\d+(?:[.,:-]\d+)*)([A-Za-z])', r'\1 \2', text)
     text = re.sub(r'([A-Z][a-z]+)([A-Z][a-z]+)', r'\1 \2', text)
-    text = re.sub(r'\s{2,}', ' ', text)
+    text = re.sub(r'\s+([.!?,;:])', r'\1', text)
+    text = re.sub(r'(?<!\d)([,.!:;])(?!\d)', r'\1 ', text)
+    text = re.sub(r'(?<!\b[a-z])([a-z])([A-Z][a-z])', r'\1 \2', text)
+    text = re.sub(r'([a-z])([A-Z]{2,})\b', r'\1 \2', text)
+    text = re.sub(r'\s+', ' ', text)
 
     # restore links, urls, emails, and ellipses
     text = restore_links(text, urls, emails)
