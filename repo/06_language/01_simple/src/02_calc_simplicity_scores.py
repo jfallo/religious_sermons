@@ -1,15 +1,14 @@
 import pandas as pd
+from scipy import stats
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-import torch
-from transformers import pipeline
-from itertools import combinations
-import random
+from sklearn.linear_model import LinearRegression
 import matplotlib.pyplot as plt
+import textstat
 
 
 # load sermons
-df_sermons = pd.read_csv("intermediate/sermonscopy.csv")
+df_sermons = pd.read_csv("intermediate/sermons.csv")
 
 # define metrics
 wordLengthMetrics = ['avgWordChars', 'perW7C', 'perW6C', 'avgWordSylls', 'perWgeq3Sy', 'perWlt3Sy', 'perW2Sy', 'perW1Sy']
@@ -39,11 +38,56 @@ df['word_length_score'] = df[wordLengthMetrics].mean(axis= 1)
 df['sentence_length_score'] = df[sentenceLengthMetrics].mean(axis= 1)
 df['word_rarity_score'] = df[wordRarityMetrics].mean(axis= 1)
 df['pos_score'] = df[posMetrics].mean(axis= 1)
-metricScores = ['word_length_score', 'sentence_length_score', 'word_rarity_score', 'pos_score']
+scores = ['word_length_score', 'sentence_length_score', 'word_rarity_score', 'pos_score']
 
-weights = [4, 2, 2, 1]
-df['complexity'] = df[metricScores].dot(weights)
+weights = [1, 1, 1, 1]
+df['complexity'] = df[scores].dot(weights)
 df['simplicity'] = -df['complexity']
+
+
+# sermon-level regression for each metric and composite score
+for metric in metrics + scores:
+    slope, intercept, r, p, se = stats.linregress(df['year'], df[metric])
+    print(f"{metric}: slope={slope:.4f}, r={r:.3f}, p={p:.3f}")
+
+# yearly aggregation
+avgSimplicityByYear = df.groupby('year')['simplicity'].mean().sort_index()
+years = avgSimplicityByYear.index.values.reshape(-1,1)
+simplicity = avgSimplicityByYear.values
+# sermon-level regression for simplicity score
+slope, intercept, r, p, se = stats.linregress(df['year'], df['simplicity'])
+print(f"simplicity_score_pred: slope={slope:.4f}, r={r:.3f}, p={p:.3f}")
+preds = slope * years.flatten() + intercept
+# sermon counts
+sermon_counts = df.groupby('year').size()
+
+# plot simplicity over time and sermons per year
+fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+axes[0].scatter(years, simplicity)
+axes[0].plot(years, preds, color= 'red', linestyle= '--', label= 'Regression Line')
+axes[0].set_xlabel('Year')
+axes[0].set_ylabel('Mean Simplicity Score')
+axes[0].set_title('Sermon Simplicity Over Time')
+axes[0].grid(True, linestyle= '--', alpha= 0.5)
+axes[0].text(
+    0.05, 0.95,
+    f"Slope: {slope:.4f}\nR²: {r**2:.3f}\np={p:.3f}",
+    transform= axes[0].transAxes,
+    verticalalignment= 'top',
+    bbox= dict(facecolor= 'white', alpha= 0.8)
+)
+axes[1].bar(sermon_counts.index, sermon_counts.values, color= 'steelblue', alpha= 0.7)
+axes[1].set_xlabel('Year')
+axes[1].set_ylabel('Number of Sermons')
+axes[1].set_title('Sermons Per Year')
+axes[1].grid(True, linestyle= '--', alpha= 0.5)
+plt.tight_layout()
+plt.show()
+
+# sermon-level regression for Flesch Kincaid score (robustness check)
+df['flesch_kincaid'] = df['sermontext'].apply(textstat.flesch_kincaid_grade)
+slope, intercept, r, p, se = stats.linregress(df['year'], df['flesch_kincaid'])
+print(f"flesch_kincaid: slope={slope:.4f}, r={r:.3f}, p={p:.3f}")
 
 
 # --- PCA --- #
@@ -56,76 +100,3 @@ pcs = pca.fit_transform(df[metrics])
 loadings = pd.DataFrame(pca.components_, columns= metrics, index= ['PC1','PC2','PC3','PC4'])
 print(pca.explained_variance_ratio_)
 print(loadings.T)
-print()
-
-
-# --- get initial simplicity scores --- #
-
-random.seed(100)
-bart = pipeline('zero-shot-classification', model= 'facebook/bart-large-mnli')
-
-def subtext(text, max_chars= 1000):
-    if len(text) <= max_chars:
-        return text
-    return text[:max_chars].rsplit(' ', 1)[0]
-
-def write_prompt(a, text_a, b, text_b):
-    return {
-        'A': a,
-        'B': b,
-        'prompt': f"Text A: {subtext(text_a)} Text B: {subtext(text_b)} Easier:"
-    }
-
-def get_pair_prompts(df, n_pairs):
-    prompts = []
-    seen = set()
-
-    while len(prompts) < n_pairs:
-        i, j = sorted(random.sample(range(len(df)), 2))
-        if (i,j) in seen:
-            continue
-        seen.add((i,j))
-        text_i = df.loc[i, 'sermontext']
-        text_j = df.loc[j, 'sermontext']
-        prompts.append(write_prompt(i, text_i, j, text_j))
-
-    return prompts
-
-def get_pairwise_simplicity_scores(pairPrompts, bart):
-    batch_size = 32
-    scores = []
-
-    for start in range(0, len(pairPrompts), batch_size):
-        batch = pairPrompts[start:start+batch_size]
-
-        results = bart(
-            [pair['prompt'] for pair in batch], 
-            candidate_labels= ["Text A", "Text B"], 
-            batch_size= batch_size
-        )
-
-        for pair, res in zip(batch, results):
-            label_scores = dict(zip(res['labels'], res['scores']))
-            score = label_scores["Text A"] - label_scores["Text B"]
-            
-            scores.append({
-                'A': pair['A'],
-                'B': pair['B'],
-                'score': score
-            })
-        
-        if start % 320 == 0:
-            print(f"{start}/{len(pairPrompts)}")
-    
-    return scores
-
-pairPrompts = get_pair_prompts(df, 4)
-initialScores = get_pairwise_simplicity_scores(pairPrompts, bart)
-
-for score in initialScores:
-    print(score)
-    print(f"Simplicity score A: {df.iloc[score['A']]['simplicity']}")
-    print(f"Simplicity score B: {df.iloc[score['B']]['simplicity']}")
-    print()
-    print()
-    print()
