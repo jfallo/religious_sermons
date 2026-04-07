@@ -177,7 +177,7 @@ def get_sentence_length_metrics(text):
 
 
 # rare word helper functions
-with open('input/dale-chall-words.txt') as f:
+with open("01_simple/input/dale-chall-words.txt") as f:
     wordsDaleChall = f.read().strip().lower().split(' ')
 wordsBrown = [w.lower() for w in brown.words()] # need to run nltk.download('brown')
 countsBrown = Counter(wordsBrown)
@@ -258,7 +258,7 @@ for start in range(0, len(df), batch_size):
         lambda text : get_pos_metrics(text) if pd.notna(text) and len(text) < 100000 else [None] * 5
     ).tolist()
 
-    batch.to_csv("intermediate/sermons.csv", mode= 'w' if first_batch else 'a', header= first_batch, index= False, quoting= csv.QUOTE_ALL)
+    batch.to_csv("01_simple/intermediate/sermons.csv", mode= 'w' if first_batch else 'a', header= first_batch, index= False, quoting= csv.QUOTE_ALL)
     first_batch = False
 
     print(f"Rows {start} to {end} complete.")

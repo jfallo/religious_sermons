@@ -1,1 +1,15 @@
-/venv/
+# Python venv
+venv/
+
+# large files
+input
+01_simple/bart-simplicity
+01_simple/input
+01_simple/intermediate/sermons.csv
+02_polarized/input/
+02_polarized/output/sermons_old.csv
+02_polarized/output/sermons.csv
+02_polarized/output/figs/lexicon/
+
+# testing scripts
+02_polarized/src/tmp.py
