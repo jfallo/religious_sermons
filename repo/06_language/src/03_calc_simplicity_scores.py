@@ -11,7 +11,7 @@ import choix
 
 
 # load sermons
-df_sermons = pd.read_csv("01_simple/intermediate/sermons.csv")
+df_sermons = pd.read_csv("intermediate/sermons_with_simplicity_score.csv")
 
 # define metrics
 wordLengthMetrics = ['avgWordChars', 'perW7C', 'perW6C', 'avgWordSylls', 'perWgeq3Sy', 'perWlt3Sy', 'perW2Sy', 'perW1Sy']
@@ -57,7 +57,7 @@ for metric in metrics:
         verticalalignment= 'top',
         bbox= dict(facecolor= 'white', alpha= 0.8)
     )
-    plt.savefig("01_simple/output/figs/" + f"{metric}_over_time.png")
+    plt.savefig("output/figs/simplicity/" + f"{metric}_over_time.png")
     plt.close()
 
 # normalize metrics
@@ -123,11 +123,11 @@ axes[1].set_ylabel('Number of Sermons')
 axes[1].set_title('Sermons Per Year')
 axes[1].grid(True, linestyle= '--', alpha= 0.5)
 plt.tight_layout()
-plt.savefig("01_simple/output/figs/avgSimplicityScore_over_time.png")
+plt.savefig("0output/figs/simplicity/avgSimplicityScore_over_time.png")
 plt.close()
 
 # sermon-level regression for Flesch Kincaid score (robustness check)
-fk_cache = "01_simple/intermediate/flesch_kincaid.csv"
+fk_cache = "intermediate/flesch_kincaid.csv"
 if os.path.exists(fk_cache):
     df['flesch_kincaid'] = pd.read_csv(fk_cache)['flesch_kincaid']
 else:
@@ -157,8 +157,8 @@ else:
 print(f"Using device: {device}")
 
 random.seed(100)
-tokenizer = BartTokenizer.from_pretrained("01_simple/bart-simplicity")
-model = BartForConditionalGeneration.from_pretrained("01_simple/bart-simplicity")
+tokenizer = BartTokenizer.from_pretrained("bart-simplicity")
+model = BartForConditionalGeneration.from_pretrained("bart-simplicity")
 model.to(device)
 
 def subtext(text, max_length= 1000):
@@ -275,7 +275,7 @@ plt.text(
     verticalalignment= 'top',
     bbox= dict(facecolor= 'white', alpha= 0.8)
 )
-plt.savefig("01_simple/output/figs/" + f"{metric}_over_time.png")
+plt.savefig("output/figs/simplicity/" + f"{metric}_over_time.png")
 plt.close()
 
 

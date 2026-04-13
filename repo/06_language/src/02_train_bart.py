@@ -17,7 +17,7 @@ print(f"Using device: {device}")
 
 # --- get train and validation data --- #
 
-OSE_dir = "01_simple/input/one_stop_english_texts/"
+OSE_dir = "input/one_stop_english_texts/"
 level_order = {'Elementary': 0, 'Intermediate': 1, 'Advanced': 2}
 
 def get_pairs(OSE_dir):
@@ -152,7 +152,7 @@ for epoch in range(30):
     # save best model
     if val_acc > best_val_acc:
         best_val_acc = val_acc
-        model.save_pretrained("01_simple/bart-simplicity")
-        tokenizer.save_pretrained("01_simple/bart-simplicity")
+        model.save_pretrained("bart-simplicity")
+        tokenizer.save_pretrained("bart-simplicity")
 
 print(f"\nTraining complete. Best validation accuracy: {best_val_acc:.3f}")

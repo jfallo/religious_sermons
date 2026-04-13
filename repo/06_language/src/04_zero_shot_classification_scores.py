@@ -50,7 +50,7 @@ metrics = [
 ]
 
 
-if not os.path.exists("02_polarized/output/sermons.csv"):
+if not os.path.exists("output/sermons_deberta.csv"):
     df = pd.read_csv("input/sermons.csv")
     df = df.dropna(subset= ['sermontext']).reset_index(drop= True)
     df = df[df['sermontext'].str.len() >= 1500].reset_index(drop= True)
@@ -64,7 +64,7 @@ if not os.path.exists("02_polarized/output/sermons.csv"):
 
 
     tqdm.pandas()
-    classifier = pipeline('zero-shot-classification', model= 'facebook/bart-large-mnli')
+    classifier = pipeline('zero-shot-classification', model= 'MoritzLaurer/deberta-v3-large-zeroshot-v2.0')
 
 
     def get_score(text, labels):
@@ -72,16 +72,17 @@ if not os.path.exists("02_polarized/output/sermons.csv"):
         tokens = tokenizer.encode(text, add_special_tokens= False)
         chunk_size = 768
         chunks = [tokens[i:i+chunk_size] for i in range(0, len(tokens), chunk_size)]
-        score = 0
-        
-        for chunk in chunks:
-            chunk_text = tokenizer.decode(chunk, skip_special_tokens= True, clean_up_tokenization_spaces= True)
-            result = classifier(chunk_text, candidate_labels= labels, truncation= True, max_length= 1024)
-            index = result['labels'].index(labels[0])
-            score += result['scores'][index]
+        chunk_texts = [
+            tokenizer.decode(chunk, skip_special_tokens= True, clean_up_tokenization_spaces= True)
+            for chunk in chunks
+        ]
+        results = classifier(chunk_texts, candidate_labels= labels, truncation= True, max_length= 1024, batch_size= 8)
+        scores = [result['scores'][result['labels'].index(labels[0])] for result in results]
             
-        return score / len(chunks)
+        return sum(scores) / len(scores)
     
     for metric in metrics:
-        df_sample[metric['name'] + '_score'] = df_sample['sermontext'].progress_apply(get_score, args= ([metric['labels'][0], metric['labels'][1]],))
-        df_sample.to_csv("02_polarized/output/sermons.csv", index= False, quoting= csv.QUOTE_ALL)
+        if metric['name'] == 'polarization':
+            print(f"Running {metric['name']} classification...")
+            df_sample[metric['name'] + '_score'] = df_sample['sermontext'].progress_apply(get_score, args= ([metric['labels'][0], metric['labels'][1]],))
+            df_sample.to_csv("output/sermons_deberta.csv", index= False, quoting= csv.QUOTE_ALL)

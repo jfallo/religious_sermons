@@ -1,3 +1,11 @@
+import pandas as pd
+from tqdm import tqdm
+import csv, os, json, time
+import openai
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+
+
 COMPLEXITY_EXAMPLES = """
 "complex language" examples:
 - Perhaps God's predilection for those words grew out of His acute sense of the thinly veiled fear that grips all who approach the living God.
@@ -70,3 +78,152 @@ REASONING_EXAMPLES = """
 - Oppressed people throughout history have always turned to God.
 - God is all encompassing. His presence permeates and penetrates everything and everyone.
 """
+
+metrics = [
+    {
+        'name': 'complexity',
+        'labels': [
+            "complex academic or theological language, abstract concepts, dense sentence structure, sophisticated vocabulary",
+            "simple plain language, narrative storytelling, conversational tone, easy-to-follow sentences"
+        ],
+        'examples': COMPLEXITY_EXAMPLES
+    },
+    {
+        'name': 'polarization',
+        'labels': [
+            "polarized us-vs-them language, condemning outsiders, culture-war framing, moral blame",
+            "inclusive language, welcoming, emphasizing unity, shared dignity, openness to all people"
+        ],
+        'examples': POLARIZATION_EXAMPLES
+    },
+    {
+        'name': 'confidence',
+        'labels': [
+            "high-confidence language, moral certainty, definitive truth claims, authoritative tone",
+            "low-confidence language, hedging and uncertainty, cautious speculation, tentative interpretation"
+        ],
+        'examples': CONFIDENCE_EXAMPLES
+    },
+    {
+        'name': 'scope',
+        'labels': [
+            "universalist language emphasizing all people, global inclusion, everyone belongs",
+            "communal language addressing a local group, congregation-focused, shared community identity"
+        ],
+        'examples': SCOPE_EXAMPLES
+    },
+    {
+        'name': 'emotion',
+        'labels': [
+            "emotional language, engaging, relatable storytelling, expressing fear, grief, joy, pain, personal vulnerability",
+            "emotionally neutral analytical language, detached explanation, academic or informational tone"
+        ],
+        'examples': EMOTION_EXAMPLES
+    },
+    {
+        'name': 'reasoning',
+        'labels': [
+            "evidence-based reasoning citing scripture, facts, history, statistics, or textual proof",
+            "intuitive reasoning based on personal experience, spiritual feeling, impression, or common sense"
+        ],
+        'examples': REASONING_EXAMPLES
+    }
+]
+
+
+client = openai.OpenAI()
+tqdm.pandas()
+
+CHUNK_SIZE = 3000
+INPUT_COST  = 2.50 / 1_000_000
+OUTPUT_COST = 15.00 / 1_000_000
+total_input_tokens = 0
+total_output_tokens = 0
+cost_lock = threading.Lock()
+
+
+def get_score(text, labels, examples):
+    chunks = [text[i : i+CHUNK_SIZE] for i in range(0, len(text), CHUNK_SIZE)]
+    scores = []
+
+    def score_chunk(chunk):
+        prompt = f"""
+You are a text classifier and an expert at analyzing religious sermon texts. Given the text below, determine which of the following better describes the text.
+
+Label A: {labels[0]}
+Label B: {labels[1]}
+
+Here are some examples for each label to guide your classification:
+{examples}
+
+Text:
+\"\"\"
+{chunk}
+\"\"\"
+
+Respond with ONLY a JSON object in this exact format (no explanation):
+{{"score": <float between 0.0 and 1.0>}}
+where 1.0 means the passage perfectly matches Label A, 0.0 means it perfectly matches Label B, and 0.5 means it is neutral or equally describes both.
+"""
+        for attempt in range(3):
+            try:
+                response = client.chat.completions.create(
+                    model= 'gpt-5.4',
+                    messages= [{'role': 'user', 'content': prompt}],
+                    temperature= 0,
+                    response_format= {'type': 'json_object'},
+                )
+
+                with cost_lock:
+                    global total_input_tokens, total_output_tokens
+                    total_input_tokens += response.usage.prompt_tokens
+                    total_output_tokens += response.usage.completion_tokens
+
+                return float(json.loads(response.choices[0].message.content)['score'])
+            except openai.BadRequestError:
+                return 0.5
+            except openai.RateLimitError:
+                time.sleep(2 ** attempt)
+            
+        return 0.5
+
+    with ThreadPoolExecutor(max_workers= 8) as executor:
+        scores = list(executor.map(score_chunk, chunks))
+
+    return sum(scores) / len(scores)
+
+
+if not os.path.exists("output/sermons_gpt.csv"):
+    df = pd.read_csv("input/sermons.csv")
+    df = df.dropna(subset= ['sermontext']).reset_index(drop= True)
+    df = df[df['sermontext'].str.len() >= 1500].reset_index(drop= True)
+    
+    samples = (
+        df.groupby('year')
+        .apply(lambda x : x.sample(min(len(x), 200), random_state= 42))
+        .index.get_level_values(1)
+    )
+    df_sample = df.loc[samples].reset_index(drop= True)
+
+    for metric in metrics:
+        if metric['name'] == 'polarization':
+            print(f"Running {metric['name']} classification...")
+            with ThreadPoolExecutor(max_workers= 16) as executor:
+                futures = {
+                    executor.submit(get_score, row['sermontext'], metric['labels'], metric['examples']): i
+                    for i, row in df_sample.iterrows()
+                }
+                results = {}
+
+                for future in tqdm(as_completed(futures), total= len(futures)):
+                    i = futures[future]
+                    results[i] = future.result()
+
+
+            df_sample[metric['name'] + '_score'] = pd.Series(results)
+            df_sample.to_csv("output/sermons_gpt.csv", index= False, quoting= csv.QUOTE_ALL)
+
+            total_cost = (total_input_tokens * INPUT_COST) + (total_output_tokens * OUTPUT_COST)
+            print(f"Input tokens:  {total_input_tokens:,}")
+            print(f"Output tokens: {total_output_tokens:,}")
+            print(f"Total cost:    ${total_cost:.4f}")
