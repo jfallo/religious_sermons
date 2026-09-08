@@ -8,12 +8,10 @@ resp = requests.get(url)
 soup = BeautifulSoup(resp.text, "html.parser")
 
 rows = []
-
 for i in range(1,68):
     url = f'https://hirr.hartfordinternational.edu/research/megachurch-database/megachurches-by-state/?sf_paged={i}'
     response = requests.get(url)
     table = BeautifulSoup(response.text, 'html.parser').find('table')
-
     skip_header = True if i > 1 else False
 
     for tr in table.find_all('tr'):

@@ -1,6 +1,3 @@
-# Python venv
-venv/
-
 # large files
 input
 bart-simplicity
@@ -8,6 +5,3 @@ intermediate
 output/sermons_bart.csv
 output/sermons_deberta.csv
 output/sermons_gpt.csv
-
-# testing scripts
-src/tmp.py

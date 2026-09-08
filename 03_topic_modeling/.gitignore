@@ -1,17 +1,3 @@
-# MacOS junk
-.DS_Store
-input/.DS_Store
-intermediate/.DS_Store
-output/.DS_Store
-
-# Python venv
-bin/
-include/
-lib/
-share/
-dist_metrics.pxd
-pyvenv.cfg
-
 # large files
 input/sermons.csv
 intermediate/pattern_matching/
